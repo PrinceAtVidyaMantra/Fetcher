@@ -68,6 +68,8 @@ function initialSync(currentDate) {
     console.log(`Fetching records from ${startDate.toUTCString()} to ${currentDate.toUTCString()}`);
     let dateItr = startDate;
     forward(dateItr, currentDate);
+    console.log(currentDate);
+    console.log(new Date(Date.now()));
 }
 
 function sync(lastFetch, currentDate) {
