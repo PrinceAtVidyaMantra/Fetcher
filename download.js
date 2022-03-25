@@ -123,10 +123,9 @@ class Downloader {
                 console.log(this.downloaded[cnt++]);
             }
         }
-
         this.noOfDownloadedFiles += 1;
+        if (this.sentFileIndex < this.urls.length)
         this.downloadedPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
-
     }
 }
 
@@ -143,10 +142,7 @@ class DownloadPool {
         .then((data)=> data.json())
         .then((res) => {
             this.queue.splice(this.queue.indexOf(url), 1);
-            
-            if (this.downloader.sentFileIndex < this.downloader.urls.length)
             this.downloader.recievedDownloadedEvent(url, index, res);
-
             // work on data recieved
         }).catch((err) => {
             console.log("Failed");
