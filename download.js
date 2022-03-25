@@ -1,4 +1,5 @@
 const startDate = new Date(Date.UTC(2021, 0, 1));
+const initialJsons = {}
 let urls = [];
 const MONTH_LIST = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -21,24 +22,20 @@ let request = (interval_name, date) => {
     const jsonPath = "https://dyncdn.exampathfinder.com/tempjsons/event"
     if (interval_name == 'year') {
         const filename = `/y/${year}.json`;
-        // console.log(`Time: Year ${year}, File: ${filename}`);
         urls.push(jsonPath + filename);
     }
     else if (interval_name == 'month') {
         const filename = `/m/${year}-${month + 1}.json`;
         const name = MONTH_LIST[month];
-        // console.log(`Time: ${name} ${year}, File: ${filename}`);
         urls.push(jsonPath + filename);
     }
     else if (interval_name == 'day') {
         const filename = `/d/${year}-${dayOfYear}.json`;
-        // console.log(`Time: Day ${dayOfYear} of ${year}, File: ${filename}`);
         urls.push(jsonPath + filename);
 
     }
     else if (interval_name == 'hour') {
         const filename = `/h/${year}-${dayOfYear}-${hours + 1}.json`;
-        // console.log(`Time: Hour ${hours + 1} of day ${dayOfYear}, ${year}, File: ${filename}`);
         // urls.push(jsonPath + filename);
     }
     else {
@@ -112,6 +109,7 @@ class Downloader {
             // merge(file);
             console.log(`Merging - ${index}`);
             console.log(file);
+            merge(file)
         }
 
         // Merge next files
@@ -120,7 +118,8 @@ class Downloader {
             while (this.downloaded[cnt] !== undefined) {
                 // merge(this.downloaded[cnt++]);
                 console.log(`Merging - ${cnt}`);
-                console.log(this.downloaded[cnt++]);
+                merge(this.downloaded[cnt])
+                cnt++
             }
         }
         this.noOfDownloadedFiles += 1;
@@ -133,24 +132,41 @@ class DownloadPool {
     constructor(downloader) {
         this.queue = [];
         this.downloader = downloader;
+        this.count = 0;
     }
-    async enqueue(url, index) {
+    enqueue(url, index) {
         this.queue.push(url);
-        console.log(url);
-        if (!url) debugger;
-        const data = await fetch(url)
+        let fileDownloaded = false;
+        const controller = new AbortController();
+        fetch(url, { signal: controller.signal })
         .then((data)=> data.json())
         .then((res) => {
+            console.log(`Downloaded File ${this.downloader.urls.indexOf(url)}`);
+            fileDownloaded = true;
             this.queue.splice(this.queue.indexOf(url), 1);
             this.downloader.recievedDownloadedEvent(url, index, res);
             // work on data recieved
         }).catch((err) => {
+            fileDownloaded = false;
             console.log("Failed");
             console.log(err);
         })
+
+        setTimeout(()=>{
+            if(!fileDownloaded && this.count < 3){
+            controller.abort();
+            this.enqueue(url, index)
+            this.count++
+            }
+        }, 10000)
     }
 }
 
-
+function merge(data){
+    Object.keys(data).forEach(key => {
+        initialJsons[key] = data[key]
+    });
+    console.log(Object.values(initialJsons).length);
+}
 
 initialSync()
