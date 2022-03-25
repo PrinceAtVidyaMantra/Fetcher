@@ -101,7 +101,7 @@ class Downloader {
         let undefinedFound = false;
 
         // Find if any previous index file isn't downloaded yet
-        for (let i = 0; i < index - 1; ++i) {
+        for (let i = 0; i < index; ++i) {
             if (this.downloaded[i] === undefined) {
                 undefinedFound = true;
                 break;
