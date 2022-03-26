@@ -71,7 +71,7 @@ function forward(dateItr, currentDate) {
 function initialSync() {
     urls = [];
     const currentDate = new Date(Date.now())
-    currentDate.setDate(currentDate.getDate() - 4);
+    currentDate.setDate(currentDate.getDate() - 5);
     let dateItr = startDate;
     forward(dateItr, currentDate);
     console.log(urls);
