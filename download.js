@@ -1,5 +1,7 @@
+
 const startDate = new Date(Date.UTC(2021, 0, 1));
 const initialJsons = {}
+const initialTagJson = {}
 let urls = [];
 const MONTH_LIST = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -69,11 +71,11 @@ function forward(dateItr, currentDate) {
 function initialSync() {
     urls = [];
     const currentDate = new Date(Date.now())
-    currentDate.setDate(currentDate.getDate() - 4);
+    currentDate.setDate(currentDate.getDate() - 5);
     let dateItr = startDate;
     forward(dateItr, currentDate);
-    let my_downloader = new Downloader(urls, 5);
     console.log(urls);
+    let my_downloader = new Downloader(urls, 5);
     my_downloader.start()
 }
 
@@ -106,9 +108,7 @@ class Downloader {
         }
         // Merge this file
         if (!undefinedFound) {
-            // merge(file);
             console.log(`Merging - ${index}`);
-            console.log(file);
             merge(file)
         }
 
@@ -116,7 +116,7 @@ class Downloader {
         if (this.downloaded[index + 1] !== undefined) {
             let cnt = index + 1;
             while (this.downloaded[cnt] !== undefined) {
-                // merge(this.downloaded[cnt++]);
+                
                 console.log(`Merging - ${cnt}`);
                 merge(this.downloaded[cnt])
                 cnt++
@@ -124,7 +124,10 @@ class Downloader {
         }
         this.noOfDownloadedFiles += 1;
         if (this.sentFileIndex < this.urls.length)
-        this.downloadedPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
+        {
+            this.downloadedPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
+        }
+        
     }
 }
 
@@ -132,7 +135,7 @@ class DownloadPool {
     constructor(downloader) {
         this.queue = [];
         this.downloader = downloader;
-        this.count = 0;
+        this.counts = this.downloader.urls.map(item => {return {count : 0}})
     }
     enqueue(url, index) {
         this.queue.push(url);
@@ -145,7 +148,6 @@ class DownloadPool {
             fileDownloaded = true;
             this.queue.splice(this.queue.indexOf(url), 1);
             this.downloader.recievedDownloadedEvent(url, index, res);
-            // work on data recieved
         }).catch((err) => {
             fileDownloaded = false;
             console.log("Failed");
@@ -153,12 +155,14 @@ class DownloadPool {
         })
 
         setTimeout(()=>{
-            if(!fileDownloaded && this.count < 3){
+            let counter = this.counts[index].count;
+            if(!fileDownloaded && counter < 3){
+                console.log(url);
             controller.abort();
             this.enqueue(url, index)
-            this.count++
+            this.counts[index] = {count : counter + 1};
             }
-        }, 10000)
+        }, 30000)
     }
 }
 
@@ -167,6 +171,43 @@ function merge(data){
         initialJsons[key] = data[key]
     });
     console.log(Object.values(initialJsons).length);
+
+   
+}
+function mergeTags(data){
+     // for Tags
+     Object.keys(data.tags).forEach(key => {
+        const tagObject = {
+            id : data[key].id,
+            type : data[key].type,
+            lang : data[key].lang,
+            values : [...initialTagJson[key].values, ...data[key].values]
+        } 
+        initialTagJson.tags[key] = tagObject
+    })
+
+    // for Organisations
+    Object.keys(data.organisations).forEach(key => {
+        const organisationObject = {
+            id : data[key].id,
+            type : data[key].type,
+            lang : data[key].lang,
+            values : [...initialTagJson[key].values, ...data[key].values]
+        } 
+        initialTagJson.organisations[key] = organisationObject
+    })
+
+    // for exams
+    Object.keys(data.exams).forEach(key => {
+        const examObject = {
+            id : data[key].id,
+            type : data[key].type,
+            lang : data[key].lang,
+            values : [...initialTagJson[key].values, ...data[key].values]
+        } 
+        initialTagJson.exams[key] = examObject
+    })
 }
 
 initialSync()
+  
