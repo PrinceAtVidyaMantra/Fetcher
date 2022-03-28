@@ -82,16 +82,17 @@ class Downloader {
         this.urls = urls;
         this.poolSize = poolSize
         this.downloaded = new Array(urls.length);
-        this.downloadPool = new DownloadPool(this);
+        this.downloadedPool = new DownloadPool(this);
+        this.noOfDownloadedFiles = 0;
         this.sentFileIndex = 0;
         this.mergeHandler = mergeHandler;
-        this.requestsCompleted = 0;
+        this.requestCompletedCount = 0;
         this.completionHandleer = completionHandleer;
         this.isReady = false;
     }
     start() {
         for (let i = 0; i < this.poolSize; ++i) {
-            this.downloadPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
+            this.downloadedPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
         }
     }
     applyMerging(url, index, file) {
@@ -121,15 +122,16 @@ class Downloader {
                 cnt++
             }
         }
+        this.noOfDownloadedFiles += 1;
         if (this.sentFileIndex < this.urls.length) {
-            this.downloadPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
+            this.downloadedPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
         }
     }
     checkCompleted() {
-        // console.log( this.requestsCompleted, this.urls.length );
-        if (this.requestsCompleted == this.urls.length) {
+        // console.log( this.requestCompletedCount, this.urls.length );
+        if (this.requestCompletedCount == this.urls.length) {
             this.setReadyState();
-            this.downloadPool.clearTimeouts();
+            this.downloadedPool.clearTimeouts();
             this.completionHandleer();
         }
     }
@@ -146,7 +148,7 @@ class Downloader {
             return;
         }
         let url = this.urls[index];
-        
+
         // // if the failed file is an hour file
         // if (url.includes("/h/")) {
         //     this.isReady = true;
@@ -157,7 +159,7 @@ class Downloader {
             let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
             let todayDayNumber = findDayOfYear(new Date());
             console.log({ failedDayNumber, todayDayNumber });
-            
+
             // if the failed day is less than the currrent day, worker is not ready
             if (failedDayNumber < todayDayNumber) {
                 this.isReady = false;
@@ -179,7 +181,7 @@ class DownloadPool {
     constructor(downloader) {
         this.queue = [];
         this.downloader = downloader;
-        this.counts = this.downloader.urls.map(item => 0 );
+        this.counts = this.downloader.urls.map(item => 0);
         this.timeouts = [];
     }
     clearTimeouts() {
@@ -190,46 +192,88 @@ class DownloadPool {
     enqueue(url, index) {
         this.queue.push(url);
         let fileDownloaded = false;
-        const controller = new AbortController();
+        const refThis = this;
 
-        fetch(url, { signal: controller.signal })
-            .then((data)=> {
-                data.json().then(res => {
-                    console.log(`Downloaded File ${this.downloader.urls.indexOf(url)}`);
-                    fileDownloaded = true;
-                    this.queue.splice(this.queue.indexOf(url), 1);
-                    this.downloader.applyMerging(url, index, res);
-                    this.downloader.requestsCompleted += 1;
-                    console.log("Requests Completed", {Result: "Successfully Merged"}, this.downloader.requestsCompleted, {url, index});
-                    this.downloader.checkCompleted();
-                
-                }).catch((jsonErr) => {
-                    fileDownloaded = false;
-                    console.log(jsonErr);
-                })
+        // const controller = new AbortController();
+        // const CancelToken = axios.CancelToken;
+        // const source = CancelToken.source();
 
-            }).catch((err) => {
-                fileDownloaded = false;
-                console.log("Failed ", {err});
-            })
+        axios.get(url, { timeout: 2000 }).then(data => {
+            let res = data.data;
 
-        const timeout = setTimeout(() => {
-            let counter = this.counts[index];
-            this.counts[index] += 1;
+            console.log(`Downloaded File ${refThis.downloader.urls.indexOf(url)}`);
+            fileDownloaded = true;
+            refThis.queue.splice(refThis.queue.indexOf(url), 1);
+            refThis.downloader.applyMerging(url, index, res);
+            refThis.downloader.requestCompletedCount += 1;
+            console.log("Requests Completed", { Result: "Successfully Merged" }, refThis.downloader.requestCompletedCount, { url, index });
+            refThis.downloader.checkCompleted();
 
-            if (!fileDownloaded && counter < 2) {
-                controller.abort();
-                this.enqueue(url, index)
-                console.log("Re-trying", { url, index });
+        }).catch(function (thrown) {
+            if (thrown.code === "ECONNABORTED") {
+                console.log("Timeout Request");
 
-            } else if (!fileDownloaded && counter >= 2) {
-                this.downloader.requestsCompleted += 1;
-                console.log("Requests Completed", {Result: "Failure"}, this.downloader.requestsCompleted, {url, index});
-                this.downloader.checkCompleted();
+                let counter = refThis.counts[index];
+                refThis.counts[index] += 1;
+
+                if (!fileDownloaded && counter < 2) {
+                    refThis.enqueue(url, index)
+                    console.log("Re-trying", { url, index });
+
+                } else if (!fileDownloaded && counter >= 2) {
+                    refThis.downloader.requestCompletedCount += 1;
+                    console.log("Requests Completed", { Result: "Failure" }, refThis.downloader.requestCompletedCount, { url, index });
+                    refThis.downloader.checkCompleted();
+                }
             }
-        }, 2000);
+            if (axios.isCancel(thrown)) {
+                console.log('Request canceled', thrown.message);
+            } else {
+                fileDownloaded = false;
+                console.log("Failed ", { thrown });
+            }
+        })
 
-        this.timeouts.push(timeout);
+
+        // fetch(url, { signal: controller.signal })
+        //     .then((data) => {
+        //         data.json().then(res => {
+        //             console.log(`Downloaded File ${this.downloader.urls.indexOf(url)}`);
+        //             fileDownloaded = true;
+        //             this.queue.splice(this.queue.indexOf(url), 1);
+        //             this.downloader.applyMerging(url, index, res);
+        //             this.downloader.requestCompletedCount += 1;
+        //             console.log("Requests Completed", { Result: "Successfully Merged" }, this.downloader.requestCompletedCount, { url, index });
+        //             this.downloader.checkCompleted();
+
+        //         }).catch((jsonErr) => {
+        //             fileDownloaded = false;
+        //             console.log(jsonErr);
+        //         })
+
+        //     }).catch((err) => {
+        //         fileDownloaded = false;
+        //         console.log("Failed ", { err });
+        //     })
+
+        // const timeout = setTimeout(() => {
+        //     let counter = this.counts[index];
+        //     this.counts[index] += 1;
+
+        //     if (!fileDownloaded && counter < 2) {
+        //         // controller.abort();
+        //         source.cancel();
+        //         this.enqueue(url, index)
+        //         console.log("Re-trying", { url, index });
+
+        //     } else if (!fileDownloaded && counter >= 2) {
+        //         this.downloader.requestCompletedCount += 1;
+        //         console.log("Requests Completed", { Result: "Failure" }, this.downloader.requestCompletedCount, { url, index });
+        //         this.downloader.checkCompleted();
+        //     }
+        // }, 2000);
+
+        // this.timeouts.push(timeout);
     }
 }
 
@@ -276,34 +320,34 @@ function initialSync() {
         const eventsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/event";
         const tagsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/tag";
 
-        // forward(dateItr, currentDate, eventsBaseURL, eventUrls); 
+        forward(dateItr, currentDate, eventsBaseURL, eventUrls); 
         dateItr = new Date(startDate.getTime());
         forward(dateItr, currentDate, tagsBaseURL, tagUrls);
 
         let downloadsCompleted = 0;
         let totalDownloads = 1;
-        console.log({tagUrls, eventUrls});
+        console.log({ tagUrls, eventUrls });
 
-        // const events_downloader = new Downloader(eventUrls, 5, mergeEvents, () => { resolver() });
-        // events_downloader.start()
+        const events_downloader = new Downloader(eventUrls, 5, mergeEvents, () => { resolver() });
+        events_downloader.start()
         const tags_downloader = new Downloader(tagUrls, 5, mergeTags, () => { resolver() });
         tags_downloader.start()
 
-        // let resolver = () => {
-        //     downloadsCompleted += 1;
-        //     if (downloadsCompleted == 2) {
-        //         if (!events_downloader.isReady || !tags_downloader.isReady) reject();
-        //         else resolve();
-        //     }
-        // }
-        
         let resolver = () => {
             downloadsCompleted += 1;
             if (downloadsCompleted == totalDownloads) {
-                if (!tags_downloader.isReady) reject();
+                if (!events_downloader.isReady || !tags_downloader.isReady) reject();
                 else resolve();
             }
         }
+
+        // let resolver = () => {
+        //     downloadsCompleted += 1;
+        //     if (downloadsCompleted == totalDownloads) {
+        //         if (!tags_downloader.isReady) reject();
+        //         else resolve();
+        //     }
+        // }
     })
 }
 
