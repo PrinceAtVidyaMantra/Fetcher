@@ -76,9 +76,39 @@ function forward(dateItr, currentDate, baseURL, urls) {
     }
 }
 
+function mergeEvents(data) {
+    mergeTags({ events: data })
+}
+function mergeTags(data) {
+    // for Tags
+    if (data.tags)
+        Object.keys(data.tags).forEach(key => {
+            const oldValues = dataStore[key] ? dataStore[key].values : {};
+            const tagObject = {
+                id: data.tags[key].id,
+                type: data.tags[key].type,
+                lang: data.tags[key].lang,
+                values: { ...oldValues, ...data.tags[key].values },
+            }
+            dataStore.tags[key] = tagObject;
+        })
+
+    // for Organisations
+    if (data.organisations)
+        dataStore.organisations = { ...dataStore.organisations, ...data.organisations };
+
+    // for exams
+    if (data.exams)
+        dataStore.exams = { ...dataStore.exams, ...data.exams };
+
+    // for exams
+    if (data.events)
+        dataStore.events = { ...dataStore.events, ...data.events };
+}
+
 class Downloader {
 
-    constructor(urls, poolSize, mergeHandler, completionHandleer) {
+    constructor(urls, poolSize, mergeHandler, completionHandler) {
         this.urls = urls;
         this.poolSize = poolSize
         this.downloaded = new Array(urls.length);
@@ -86,7 +116,7 @@ class Downloader {
         this.sentFileIndex = 0;
         this.mergeHandler = mergeHandler;
         this.requestsCompleted = 0;
-        this.completionHandleer = completionHandleer;
+        this.completionHandler = completionHandler;
         this.isReady = false;
     }
     start() {
@@ -130,7 +160,7 @@ class Downloader {
         if (this.requestsCompleted == this.urls.length) {
             this.setReadyState();
             this.downloadPool.clearTimeouts();
-            this.completionHandleer();
+            this.completionHandler();
         }
     }
     setReadyState() {
@@ -146,27 +176,22 @@ class Downloader {
             return;
         }
         let url = this.urls[index];
-        
+
         // // if the failed file is an hour file
         // if (url.includes("/h/")) {
         //     this.isReady = true;
         //     return;
         // }
+
         // if the failed file is a day file
         if (url.includes("/d/")) {
             let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
             let todayDayNumber = findDayOfYear(new Date());
             console.log({ failedDayNumber, todayDayNumber });
-            
-            // if the failed day is less than the currrent day, worker is not ready
-            if (failedDayNumber < todayDayNumber) {
-                this.isReady = false;
-            }
 
+            // if the failed day is less than the currrent day, worker is not ready
             // Else worker is ready
-            else {
-                this.isReady = true;
-            }
+            this.isReady = !(failedDayNumber < todayDayNumber);
             return;
         }
 
@@ -179,7 +204,7 @@ class DownloadPool {
     constructor(downloader) {
         this.queue = [];
         this.downloader = downloader;
-        this.counts = this.downloader.urls.map(item => 0 );
+        this.counts = this.downloader.urls.map(item => 0);
         this.timeouts = [];
     }
     clearTimeouts() {
@@ -193,16 +218,16 @@ class DownloadPool {
         const controller = new AbortController();
 
         fetch(url, { signal: controller.signal })
-            .then((data)=> {
+            .then((data) => {
                 data.json().then(res => {
                     console.log(`Downloaded File ${this.downloader.urls.indexOf(url)}`);
                     fileDownloaded = true;
                     this.queue.splice(this.queue.indexOf(url), 1);
                     this.downloader.applyMerging(url, index, res);
                     this.downloader.requestsCompleted += 1;
-                    console.log("Requests Completed", {Result: "Successfully Merged"}, this.downloader.requestsCompleted, {url, index});
+                    console.log("Requests Completed", { Result: "Successfully Merged" }, this.downloader.requestsCompleted, { url, index });
                     this.downloader.checkCompleted();
-                
+
                 }).catch((jsonErr) => {
                     fileDownloaded = false;
                     console.log(jsonErr);
@@ -210,7 +235,7 @@ class DownloadPool {
 
             }).catch((err) => {
                 fileDownloaded = false;
-                console.log("Failed ", {err});
+                console.log("Failed ", { err });
             })
 
         const timeout = setTimeout(() => {
@@ -223,44 +248,15 @@ class DownloadPool {
                 console.log("Re-trying", { url, index });
 
             } else if (!fileDownloaded && counter >= 2) {
+                controller.abort();
                 this.downloader.requestsCompleted += 1;
-                console.log("Requests Completed", {Result: "Failure"}, this.downloader.requestsCompleted, {url, index});
+                console.log("Requests Completed", { Result: "Failure" }, this.downloader.requestsCompleted, { url, index });
                 this.downloader.checkCompleted();
             }
         }, 2000);
 
         this.timeouts.push(timeout);
     }
-}
-
-function mergeEvents(data) {
-    mergeTags({ events: data })
-}
-function mergeTags(data) {
-    // for Tags
-    if (data.tags)
-        Object.keys(data.tags).forEach(key => {
-            const oldValues = dataStore[key] ? dataStore[key].values : {};
-            const tagObject = {
-                id: data.tags[key].id,
-                type: data.tags[key].type,
-                lang: data.tags[key].lang,
-                values: { ...oldValues, ...data.tags[key].values },
-            }
-            dataStore.tags[key] = tagObject;
-        })
-
-    // for Organisations
-    if (data.organisations)
-        dataStore.organisations = { ...dataStore.organisations, ...data.organisations };
-
-    // for exams
-    if (data.exams)
-        dataStore.exams = { ...dataStore.exams, ...data.exams };
-
-    // for exams
-    if (data.events)
-        dataStore.events = { ...dataStore.events, ...data.events };
 }
 
 function initialSync() {
@@ -282,7 +278,7 @@ function initialSync() {
 
         let downloadsCompleted = 0;
         let totalDownloads = 1;
-        console.log({tagUrls, eventUrls});
+        console.log({ tagUrls, eventUrls });
 
         // const events_downloader = new Downloader(eventUrls, 5, mergeEvents, () => { resolver() });
         // events_downloader.start()
@@ -296,7 +292,7 @@ function initialSync() {
         //         else resolve();
         //     }
         // }
-        
+
         let resolver = () => {
             downloadsCompleted += 1;
             if (downloadsCompleted == totalDownloads) {
@@ -307,6 +303,9 @@ function initialSync() {
     })
 }
 
+// =========================================
+//               Driver Code
+// =========================================
 initialSync().then(() => {
     console.log("Worker is Ready", dataStore);
 }).catch(err => {
