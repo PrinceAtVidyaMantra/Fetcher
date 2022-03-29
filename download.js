@@ -8,14 +8,12 @@ const dataStore = {
     events: {}
 };
 
-let urls = [];
 const MONTH_LIST = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
 function findDayOfYear(now) {
-    if (!now.getUTCFullYear) debugger;
     const start = new Date(Date.UTC(now.getUTCFullYear(), 0, 0));
     const diff = now - start;
     const oneDay = 1000 * 60 * 60 * 24;
@@ -56,7 +54,7 @@ function daysInMonth(month, year) {
     return new Date(year, month, 0).getUTCDate();
 }
 
-function forward(dateItr, currentDate, baseURL, urls) {
+function generateInitialURLs(dateItr, currentDate, baseURL, urls) {
 
     while (dateItr.getUTCFullYear() < currentDate.getUTCFullYear() && dateItr < currentDate) {
         request('year', dateItr, baseURL, urls);
@@ -107,22 +105,45 @@ function mergeTags(data) {
 }
 
 class Downloader {
-
-    constructor(urls, poolSize, mergeHandler, completionHandler) {
-        this.urls = urls;
+    constructor(poolSize, mergeHandler) {
+        this.urls = [];
         this.poolSize = poolSize
-        this.downloaded = new Array(urls.length);
-        this.downloadPool = new DownloadPool(this);
+        this.downloaded = new Array(this.urls.length);
         this.sentFileIndex = 0;
         this.mergeHandler = mergeHandler;
-        this.requestsCompleted = 0;
-        this.completionHandler = completionHandler;
+        this.requestsCompleted = { fails: 0, success: 0 };
         this.isReady = false;
     }
-    start() {
-        for (let i = 0; i < this.poolSize; ++i) {
+    start(completionHandler) {
+        this.completionHandler = completionHandler;
+        this.downloadPool = new DownloadPool(this);
+        for (let i = 0; i < Math.min(this.poolSize, this.urls.length); ++i) {
             this.downloadPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
         }
+    }
+    clearFinishedDownloads() {
+        let i = 0;
+        for (; i < this.urls.length; ++i) {
+            if (this.downloaded[i] === undefined) break;
+        }
+
+        // index of first failed file
+        let index = i;
+        this.urls.splice(0, index);
+        this.downloaded.splice(0, index);
+
+        this.sentFileIndex = 0;
+        this.requestsCompleted.fails = 0;
+        this.requestsCompleted.success -= index;
+        this.isReady = false;
+        this.downloadPool.clearTimeouts();
+    }
+    addFiles(urls) {
+        this.urls = [...this.urls, ...urls];
+        debugger;
+    }
+    resume(completionHandler) {
+        this.start(completionHandler);
     }
     applyMerging(url, index, file) {
         this.downloaded[index] = file;
@@ -150,14 +171,13 @@ class Downloader {
                 this.mergeHandler(this.downloaded[cnt])
                 cnt++
             }
-        }
+        }   
+    }
+    checkCompleted() {
         if (this.sentFileIndex < this.urls.length) {
             this.downloadPool.enqueue(this.urls[this.sentFileIndex], this.sentFileIndex++);
         }
-    }
-    checkCompleted() {
-        // console.log( this.requestsCompleted, this.urls.length );
-        if (this.requestsCompleted == this.urls.length) {
+        if (this.requestsCompleted.fails + this.requestsCompleted.success === this.urls.length) {
             this.setReadyState();
             this.downloadPool.clearTimeouts();
             this.completionHandler();
@@ -204,13 +224,16 @@ class DownloadPool {
     constructor(downloader) {
         this.queue = [];
         this.downloader = downloader;
-        this.counts = this.downloader.urls.map(item => 0);
+        this.counts = new Array();
         this.timeouts = [];
     }
     clearTimeouts() {
         this.timeouts.forEach(timeout => {
             clearTimeout(timeout);
         })
+        this.queue = [];
+        this.counts = new Array();
+        this.timeouts = [];
     }
     enqueue(url, index) {
         this.queue.push(url);
@@ -224,7 +247,7 @@ class DownloadPool {
                     fileDownloaded = true;
                     this.queue.splice(this.queue.indexOf(url), 1);
                     this.downloader.applyMerging(url, index, res);
-                    this.downloader.requestsCompleted += 1;
+                    this.downloader.requestsCompleted.success += 1;
                     console.log("Requests Completed", { Result: "Successfully Merged" }, this.downloader.requestsCompleted, { url, index });
                     this.downloader.checkCompleted();
 
@@ -239,17 +262,18 @@ class DownloadPool {
             })
 
         const timeout = setTimeout(() => {
+            if (this.counts[index] === undefined) this.counts[index] = 0;
             let counter = this.counts[index];
             this.counts[index] += 1;
 
             if (!fileDownloaded && counter < 2) {
                 controller.abort();
                 this.enqueue(url, index)
-                console.log("Re-trying", { url, index });
+                console.log("Re-trying", { url, index }, this.downloader.urls);
 
             } else if (!fileDownloaded && counter >= 2) {
                 controller.abort();
-                this.downloader.requestsCompleted += 1;
+                this.downloader.requestsCompleted.fails += 1;
                 console.log("Requests Completed", { Result: "Failure" }, this.downloader.requestsCompleted, { url, index });
                 this.downloader.checkCompleted();
             }
@@ -258,6 +282,12 @@ class DownloadPool {
         this.timeouts.push(timeout);
     }
 }
+
+const eventsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/event";
+const tagsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/tag";
+
+const events_downloader = new Downloader(5, mergeEvents);
+const tags_downloader = new Downloader(5, mergeTags);
 
 function initialSync() {
 
@@ -269,21 +299,21 @@ function initialSync() {
 
         const eventUrls = [];
         const tagUrls = [];
-        const eventsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/event";
-        const tagsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/tag";
 
-        forward(dateItr, currentDate, eventsBaseURL, eventUrls); 
+        generateInitialURLs(dateItr, currentDate, eventsBaseURL, eventUrls);
         dateItr = new Date(startDate.getTime());
-        forward(dateItr, currentDate, tagsBaseURL, tagUrls);
+        generateInitialURLs(dateItr, currentDate, tagsBaseURL, tagUrls);
 
         let downloadsCompleted = 0;
         let totalDownloads = 2;
-        console.log({ tagUrls, eventUrls });
 
-        const events_downloader = new Downloader(eventUrls, 5, mergeEvents, () => { resolver() });
-        events_downloader.start()
-        const tags_downloader = new Downloader(tagUrls, 5, mergeTags, () => { resolver() });
-        tags_downloader.start()
+        console.log({ tagUrls, eventUrls });
+     
+        tags_downloader.addFiles(tagUrls);
+        tags_downloader.start(() => { resolver() });
+   
+        events_downloader.addFiles(eventUrls);
+        events_downloader.start(() => { resolver() });
 
         let resolver = () => {
             downloadsCompleted += 1;
@@ -295,11 +325,102 @@ function initialSync() {
     })
 }
 
-// =========================================
-//               Driver Code
-// =========================================
+// // =========================================
+// //               Driver Code
+// // =========================================
 initialSync().then(() => {
     console.log("Worker is Ready", dataStore);
 }).catch(err => {
     console.log("Worker is Not Ready, Use API instead");
-})
+    bing();
+});
+
+
+function generateSyncURLs(lastFetch, currentDate, baseURL, urls) {
+    let dateItr = lastFetch; // last date when fetched
+
+    // Fetch Upto this year
+    while (dateItr.getUTCHours() <= 23 && dateItr < currentDate) {
+        request('hour', dateItr, baseURL, urls);
+        const hours = dateItr.getUTCHours() + 1;
+        dateItr.setUTCHours(dateItr.getUTCHours() + 1);
+        if (dateItr.getUTCHours() != hours) break;
+    }
+
+    while (dateItr.getUTCDate() <= daysInMonth(dateItr.getUTCMonth(), dateItr.getUTCFullYear()) && dateItr < currentDate) {
+        request('day', dateItr, baseURL, urls);
+        const days = dateItr.getUTCDate() + 1;
+        dateItr.setUTCDate(dateItr.getUTCDate() + 1);
+        if (dateItr.getUTCDate() != days) break;
+    }
+
+    while (dateItr.getUTCMonth() <= 11 && dateItr < currentDate) {
+        request('month', dateItr, baseURL, urls);
+        const months = dateItr.getUTCMonth() + 1;
+        dateItr.setUTCMonth(dateItr.getUTCMonth() + 1);
+        if (dateItr.getUTCMonth() != months) break;
+    }
+
+    generateInitialURLs(dateItr, currentDate, baseURL, urls);
+}
+
+
+function sync(lastFetch) {
+    return new Promise((resolve, reject) => {
+        
+        // Find the current Date
+        const currentDate = new Date(Date.now())
+        currentDate.setDate(currentDate.getDate() - 2);
+
+        // Create Arrays to hold the urls to be downloaded
+        const eventUrls = [];
+        const tagUrls = [];
+        
+        // Fill the URLs arrays
+        let dateItr = new Date(lastFetch.getTime());
+        generateSyncURLs(dateItr, currentDate, eventsBaseURL, eventUrls);
+
+        dateItr = new Date(lastFetch.getTime());
+        generateSyncURLs(dateItr, currentDate, tagsBaseURL, tagUrls);
+
+        console.log({ tagUrls, eventUrls });
+
+        // Variables for promise resolver
+        let downloadsCompleted = 0;
+        let totalDownloads = 2;
+
+        // Resume the downloaders
+        events_downloader.clearFinishedDownloads();
+        events_downloader.addFiles(eventUrls);
+        events_downloader.resume(() => { resolver() });
+
+        tags_downloader.clearFinishedDownloads();
+        tags_downloader.addFiles(tagUrls);
+        tags_downloader.resume(() => { resolver() });
+
+        // Promise resolver
+        let resolver = () => {
+            downloadsCompleted += 1;
+            if (downloadsCompleted == totalDownloads) {
+                if (!events_downloader.isReady || !tags_downloader.isReady) reject();
+                else resolve();
+            }
+        }
+    });
+}
+
+// =========================================
+//               Driver Code
+// =========================================
+
+function bing() {
+    const currentDate = new Date(Date.now())
+    currentDate.setDate(currentDate.getDate() - 5);
+    const v = findDayOfYear(currentDate);
+    debugger;
+    sync(currentDate).then(() => {
+        console.log("Worker is Ready", dataStore);
+    }).catch(err => {
+        console.log("Worker is Not Ready, Use API instead");
+    });
+}
