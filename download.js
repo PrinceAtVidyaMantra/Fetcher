@@ -140,7 +140,6 @@ class Downloader {
     }
     addFiles(urls) {
         this.urls = [...this.urls, ...urls];
-        debugger;
     }
     resume(completionHandler) {
         this.start(completionHandler);
@@ -196,13 +195,22 @@ class Downloader {
             return;
         }
         let url = this.urls[index];
+        
 
-        // // if the failed file is an hour file
+        // ================================= Hour Block =================================
+
+        // if the failed file is an hour file
         // if (url.includes("/h/")) {
-        //     this.isReady = true;
+        //     let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
+        //     let todayDayNumber = findDayOfYear(new Date());
+        //     this.isReady = (failedDayNumber === todayDayNumber);
         //     return;
         // }
+        
+        // ==============================================================================
 
+
+        // ================================= Day Block ==================================
         // if the failed file is a day file
         if (url.includes("/d/")) {
             let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
@@ -214,6 +222,9 @@ class Downloader {
             this.isReady = !(failedDayNumber < todayDayNumber);
             return;
         }
+        
+        // ==============================================================================
+
 
         // Else - Worker is not ready
         this.isReady = false;
@@ -416,8 +427,6 @@ function sync(lastFetch) {
 function bing() {
     const currentDate = new Date(Date.now())
     currentDate.setDate(currentDate.getDate() - 5);
-    const v = findDayOfYear(currentDate);
-    debugger;
     sync(currentDate).then(() => {
         console.log("Worker is Ready", dataStore);
     }).catch(err => {
