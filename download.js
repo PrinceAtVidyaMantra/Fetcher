@@ -272,31 +272,23 @@ function initialSync() {
         const eventsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/event";
         const tagsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/tag";
 
-        // forward(dateItr, currentDate, eventsBaseURL, eventUrls); 
+        forward(dateItr, currentDate, eventsBaseURL, eventUrls); 
         dateItr = new Date(startDate.getTime());
         forward(dateItr, currentDate, tagsBaseURL, tagUrls);
 
         let downloadsCompleted = 0;
-        let totalDownloads = 1;
+        let totalDownloads = 2;
         console.log({ tagUrls, eventUrls });
 
-        // const events_downloader = new Downloader(eventUrls, 5, mergeEvents, () => { resolver() });
-        // events_downloader.start()
+        const events_downloader = new Downloader(eventUrls, 5, mergeEvents, () => { resolver() });
+        events_downloader.start()
         const tags_downloader = new Downloader(tagUrls, 5, mergeTags, () => { resolver() });
         tags_downloader.start()
-
-        // let resolver = () => {
-        //     downloadsCompleted += 1;
-        //     if (downloadsCompleted == 2) {
-        //         if (!events_downloader.isReady || !tags_downloader.isReady) reject();
-        //         else resolve();
-        //     }
-        // }
 
         let resolver = () => {
             downloadsCompleted += 1;
             if (downloadsCompleted == totalDownloads) {
-                if (!tags_downloader.isReady) reject();
+                if (!events_downloader.isReady || !tags_downloader.isReady) reject();
                 else resolve();
             }
         }
