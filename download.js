@@ -54,6 +54,14 @@ function daysInMonth(month, year) {
     return new Date(year, month, 0).getUTCDate();
 }
 
+/**
+ * Genrates URLs for files starting from datItr upto currentDate in forward fashion 
+ * 
+ * @param {Date} dateItr The date to start from 
+ * @param {Date} currentDate The ending date 
+ * @param {String} baseURL The URL to be prepended in every URL
+ * @param {String[]} urls Array of URLs (All generated urls are pushed to this array)
+ */
 function generateInitialURLs(dateItr, currentDate, baseURL, urls) {
 
     while (dateItr.getUTCFullYear() < currentDate.getUTCFullYear() && dateItr < currentDate) {
@@ -300,6 +308,12 @@ const tagsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/tag";
 const events_downloader = new Downloader(5, mergeEvents);
 const tags_downloader = new Downloader(5, mergeTags);
 
+/**
+ * Downloads and merges the JSON files into dataStore, Runs initially on the first load or after refresh.
+ * 
+ * @returns {Promise} a promise which tells whether the worker can be used to fetch data or not
+ * Which means whether sufficient JSON's were downloaded or not
+ */
 function initialSync() {
 
     return new Promise((resolve, reject) => {
@@ -346,7 +360,15 @@ initialSync().then(() => {
     bing();
 });
 
-
+/**
+ * Genrates URLs for files starting from datItr upto currentDate first
+ * using backward fashion then continues with forward fashion
+ * 
+ * @param {Date} lastFetch The date to start from 
+ * @param {Date} currentDate The ending date 
+ * @param {String} baseURL The URL to be prepended in every URL
+ * @param {String[]} urls Array of URLs (All generated urls are pushed to this array)
+ */
 function generateSyncURLs(lastFetch, currentDate, baseURL, urls) {
     let dateItr = lastFetch; // last date when fetched
 
@@ -375,7 +397,13 @@ function generateSyncURLs(lastFetch, currentDate, baseURL, urls) {
     generateInitialURLs(dateItr, currentDate, baseURL, urls);
 }
 
-
+/**
+ * Downloads and merges the JSON files into dataStore, Runs after every hour or the next time the app is accessed.
+ * 
+ * @param {Date} lastFetch The date when the last sync or initialSync Ran
+ * @returns {Promise} a promise which tells whether the worker can be used to fetch data or not
+ * Which means whether sufficient JSON's were downloaded or not
+ */
 function sync(lastFetch) {
     return new Promise((resolve, reject) => {
         
