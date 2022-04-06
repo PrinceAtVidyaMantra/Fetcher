@@ -1,4 +1,7 @@
 /* eslint-disable max-classes-per-file */
+
+const ARE_LOGS_ON = false;
+
 const startDate = new Date(Date.UTC(2021, 0, 1));
 
 const dataStore = {
@@ -120,20 +123,20 @@ class DownloadPool {
     fetch(url, { signal: controller.signal })
       .then((data) => {
         data.json().then((res) => {
-          console.log(`Downloaded File ${this.downloader.urls.indexOf(url)}`);
+          if (ARE_LOGS_ON) console.log(`Downloaded File ${this.downloader.urls.indexOf(url)}`);
           fileDownloaded = true;
           this.queue.splice(this.queue.indexOf(url), 1);
           this.downloader.applyMerging(url, index, res);
           this.downloader.requestsCompleted.success += 1;
-          console.log("Requests Completed", { Result: "Successfully Merged" }, this.downloader.requestsCompleted, { url, index });
+          if (ARE_LOGS_ON) console.log("Requests Completed", { Result: "Successfully Merged" }, this.downloader.requestsCompleted, { url, index });
           this.downloader.checkCompleted();
         }).catch((jsonErr) => {
           fileDownloaded = false;
-          // console.log(jsonErr);
+          // if (ARE_LOGS_ON) console.log(jsonErr);
         });
       }).catch((err) => {
         fileDownloaded = false;
-        console.log("Failed ", { err });
+        if (ARE_LOGS_ON) console.log("Failed ", { err });
       });
 
     const timeout = setTimeout(() => {
@@ -144,11 +147,11 @@ class DownloadPool {
       if (!fileDownloaded && counter < 2) {
         controller.abort();
         this.enqueue(url, index);
-        console.log("Re-trying", { url, index });
+        if (ARE_LOGS_ON) console.log("Re-trying", { url, index });
       } else if (!fileDownloaded && counter >= 2) {
         controller.abort();
         this.downloader.requestsCompleted.fails += 1;
-        console.log("Requests Completed", { Result: "Failure" }, this.downloader.requestsCompleted, { url, index });
+        if (ARE_LOGS_ON) console.log("Requests Completed", { Result: "Failure" }, this.downloader.requestsCompleted, { url, index });
         this.downloader.checkCompleted();
       }
     }, 2000);
@@ -217,7 +220,7 @@ class Downloader {
     }
     // Merge this file
     if (!undefinedFound) {
-      console.log(`Merging - ${index}`);
+      if (ARE_LOGS_ON) console.log(`Merging - ${index}`);
       this.mergeHandler(file);
     }
 
@@ -226,7 +229,7 @@ class Downloader {
       let cnt = index + 1;
 
       while (this.downloaded[cnt] !== undefined) {
-        console.log(`Merging - ${cnt}`);
+        if (ARE_LOGS_ON) console.log(`Merging - ${cnt}`);
         this.mergeHandler(this.downloaded[cnt]);
         cnt += 1;
       }
@@ -278,7 +281,7 @@ class Downloader {
       if (url.includes("/d/")) {
         const failedDayNumber = parseInt(url.split("-")[1].split(".")[0], 10);
         const todayDayNumber = findDayOfYear(new Date());
-        console.log({ failedDayNumber, todayDayNumber });
+        if (ARE_LOGS_ON) console.log({ failedDayNumber, todayDayNumber });
 
         // if the failed day is less than the currrent day, worker is not ready
         // Else worker is ready
@@ -319,12 +322,12 @@ function initialSync() {
     dateItr = new Date(startDate.getTime());
     generateInitialURLs(dateItr, currentDate, tagsBaseURL, tagUrls, "tags");
 
-    console.log(eventUrls, tagUrls);
+    if (ARE_LOGS_ON) console.log(eventUrls, tagUrls);
 
     let downloadsCompleted = 0;
     const totalDownloads = 2;
 
-    console.log({ tagUrls, eventUrls });
+    if (ARE_LOGS_ON) console.log({ tagUrls, eventUrls });
 
     const resolver = () => {
       downloadsCompleted += 1;
@@ -403,7 +406,7 @@ function sync(lastFetch) {
     dateItr = new Date(lastFetch.getTime());
     generateSyncURLs(dateItr, currentDate, tagsBaseURL, tagUrls);
 
-    console.log({ tagUrls, eventUrls });
+    if (ARE_LOGS_ON) console.log({ tagUrls, eventUrls });
 
     // Variables for promise resolver
     let downloadsCompleted = 0;
