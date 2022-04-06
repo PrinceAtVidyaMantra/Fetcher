@@ -291,7 +291,7 @@ class DownloadPool {
             if (!fileDownloaded && counter < 2) {
                 controller.abort();
                 this.enqueue(url, index)
-                console.log("Re-trying", { url, index }, this.downloader.urls);
+                console.log("Re-trying", { url, index });
 
             } else if (!fileDownloaded && counter >= 2) {
                 controller.abort();
