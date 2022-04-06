@@ -20,7 +20,7 @@ function findDayOfYear(now) {
     return Math.floor(diff / oneDay);
 }
 
-let request = (interval_name, date, baseURL, urls) => {
+let request = (interval_name, date, baseURL, urls, type) => {
 
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
@@ -40,7 +40,7 @@ let request = (interval_name, date, baseURL, urls) => {
         const filename = `/d/${year}-${dayOfYear}.json`;
         urls.push(jsonPath + filename);
     }
-    else if (interval_name == 'hour') {
+    else if (interval_name == 'hour' && type == "events") {
         const filename = `/h/${year}-${dayOfYear}-${hours + 1}.json`;
         urls.push(jsonPath + filename);
     }
@@ -48,6 +48,7 @@ let request = (interval_name, date, baseURL, urls) => {
         console.log('Unknown case', interval_name, 'found');
     }
 };
+
 function daysInMonth(month, year) {
     return new Date(year, month, 0).getUTCDate();
 }
@@ -60,22 +61,22 @@ function daysInMonth(month, year) {
  * @param {String} baseURL The URL to be prepended in every URL
  * @param {String[]} urls Array of URLs (All generated urls are pushed to this array)
  */
-function generateInitialURLs(dateItr, currentDate, baseURL, urls) {
+function generateInitialURLs(dateItr, currentDate, baseURL, urls, type) {
 
     while (dateItr.getUTCFullYear() < currentDate.getUTCFullYear() && dateItr < currentDate) {
-        request('year', dateItr, baseURL, urls);
+        request('year', dateItr, baseURL, urls, type);
         dateItr.setUTCFullYear(dateItr.getUTCFullYear() + 1);
     }
     while (dateItr.getUTCMonth() < currentDate.getUTCMonth() && dateItr < currentDate) {
-        request('month', dateItr, baseURL, urls);
+        request('month', dateItr, baseURL, urls, type);
         dateItr.setUTCMonth(dateItr.getUTCMonth() + 1);
     }
     while (dateItr.getUTCDate() < currentDate.getUTCDate() && dateItr < currentDate) {
-        request('day', dateItr, baseURL, urls);
+        request('day', dateItr, baseURL, urls, type);
         dateItr.setUTCDate(dateItr.getUTCDate() + 1);
     }
     while (dateItr.getUTCHours() < currentDate.getUTCHours() && dateItr < currentDate) {
-        request('hour', dateItr, baseURL, urls);
+        request('hour', dateItr, baseURL, urls, type);
         dateItr.setUTCHours(dateItr.getUTCHours() + 1);
     }
 }
@@ -274,7 +275,7 @@ class DownloadPool {
 
                 }).catch((jsonErr) => {
                     fileDownloaded = false;
-                    console.log(jsonErr);
+                    // console.log(jsonErr);
                 })
 
             }).catch((err) => {
@@ -307,8 +308,8 @@ class DownloadPool {
 const eventsBaseURL = "https://dyncdn.exampathfinder.com/alertjsons/events";
 const tagsBaseURL = "https://dyncdn.exampathfinder.com/alertjsons/tags";
 
-const events_downloader = new Downloader(5, mergeEvents);
-const tags_downloader = new Downloader(5, mergeTags);
+const events_downloader = new Downloader(5, mergeEvents, "events");
+const tags_downloader = new Downloader(5, mergeTags, "tags");
 
 /**
  * Downloads and merges the JSON files into dataStore, Runs initially on the first load or after refresh.
@@ -327,9 +328,9 @@ function initialSync() {
         const eventUrls = [];
         const tagUrls = [];
 
-        generateInitialURLs(dateItr, currentDate, eventsBaseURL, eventUrls);
+        generateInitialURLs(dateItr, currentDate, eventsBaseURL, eventUrls, "events");
         dateItr = new Date(startDate.getTime());
-        generateInitialURLs(dateItr, currentDate, tagsBaseURL, tagUrls);
+        generateInitialURLs(dateItr, currentDate, tagsBaseURL, tagUrls, "tags");
 
         console.log(eventUrls, tagUrls);
 
@@ -348,7 +349,7 @@ function initialSync() {
             downloadsCompleted += 1;
             if (downloadsCompleted == totalDownloads) {
                 if (!events_downloader.isReady || !tags_downloader.isReady) reject();
-                else resolve();
+                else resolve(dataStore);
             }
         }
     })
@@ -446,7 +447,7 @@ function sync(lastFetch) {
             downloadsCompleted += 1;
             if (downloadsCompleted == totalDownloads) {
                 if (!events_downloader.isReady || !tags_downloader.isReady) reject();
-                else resolve();
+                else resolve(dataStore);
             }
         }
     });
