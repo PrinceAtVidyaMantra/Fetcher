@@ -34,17 +34,15 @@ let request = (interval_name, date, baseURL, urls) => {
     }
     else if (interval_name == 'month') {
         const filename = `/m/${year}-${month + 1}.json`;
-        const name = MONTH_LIST[month];
         urls.push(jsonPath + filename);
     }
     else if (interval_name == 'day') {
         const filename = `/d/${year}-${dayOfYear}.json`;
         urls.push(jsonPath + filename);
-
     }
     else if (interval_name == 'hour') {
         const filename = `/h/${year}-${dayOfYear}-${hours + 1}.json`;
-        // urls.push(jsonPath + filename);
+        urls.push(jsonPath + filename);
     }
     else {
         console.log('Unknown case', interval_name, 'found');
@@ -113,7 +111,8 @@ function mergeTags(data) {
 }
 
 class Downloader {
-    constructor(poolSize, mergeHandler) {
+    constructor(poolSize, mergeHandler, type) {
+        this.type = type;
         this.urls = [];
         this.poolSize = poolSize
         this.downloaded = new Array(this.urls.length);
@@ -178,7 +177,7 @@ class Downloader {
                 this.mergeHandler(this.downloaded[cnt])
                 cnt++
             }
-        }   
+        }
     }
     checkCompleted() {
         if (this.sentFileIndex < this.urls.length) {
@@ -203,36 +202,39 @@ class Downloader {
             return;
         }
         let url = this.urls[index];
-        
 
-        // ================================= Hour Block =================================
+        if (type == "tags") {
 
-        // if the failed file is an hour file
-        // if (url.includes("/h/")) {
-        //     let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
-        //     let todayDayNumber = findDayOfYear(new Date());
-        //     this.isReady = (failedDayNumber === todayDayNumber);
-        //     return;
-        // }
-        
-        // ==============================================================================
+            // ================================= Hour Block =================================
 
+            // if the failed file is an hour file
+            if (url.includes("/h/")) {
+                let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
+                let todayDayNumber = findDayOfYear(new Date());
+                this.isReady = (failedDayNumber === todayDayNumber);
+                return;
+            }
 
-        // ================================= Day Block ==================================
-        // if the failed file is a day file
-        if (url.includes("/d/")) {
-            let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
-            let todayDayNumber = findDayOfYear(new Date());
-            console.log({ failedDayNumber, todayDayNumber });
+            // ==============================================================================
 
-            // if the failed day is less than the currrent day, worker is not ready
-            // Else worker is ready
-            this.isReady = !(failedDayNumber < todayDayNumber);
-            return;
+        } else if (type == "events") {
+
+            // ================================= Day Block ==================================
+
+            // if the failed file is a day file
+            if (url.includes("/d/")) {
+                let failedDayNumber = parseInt(url.split("-")[1].split(".")[0]);
+                let todayDayNumber = findDayOfYear(new Date());
+                console.log({ failedDayNumber, todayDayNumber });
+
+                // if the failed day is less than the currrent day, worker is not ready
+                // Else worker is ready
+                this.isReady = !(failedDayNumber < todayDayNumber);
+                return;
+            }
+
+            // ==============================================================================
         }
-        
-        // ==============================================================================
-
 
         // Else - Worker is not ready
         this.isReady = false;
@@ -302,8 +304,8 @@ class DownloadPool {
     }
 }
 
-const eventsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/event";
-const tagsBaseURL = "https://dyncdn.exampathfinder.com/tempjsons/tag";
+const eventsBaseURL = "https://dyncdn.exampathfinder.com/alertjsons/events";
+const tagsBaseURL = "https://dyncdn.exampathfinder.com/alertjsons/tags";
 
 const events_downloader = new Downloader(5, mergeEvents);
 const tags_downloader = new Downloader(5, mergeTags);
@@ -319,7 +321,7 @@ function initialSync() {
     return new Promise((resolve, reject) => {
 
         const currentDate = new Date(Date.now())
-        currentDate.setDate(currentDate.getDate() - 5);
+        currentDate.setDate(currentDate.getDate());
         let dateItr = new Date(startDate.getTime());
 
         const eventUrls = [];
@@ -329,14 +331,16 @@ function initialSync() {
         dateItr = new Date(startDate.getTime());
         generateInitialURLs(dateItr, currentDate, tagsBaseURL, tagUrls);
 
+        console.log(eventUrls, tagUrls);
+
         let downloadsCompleted = 0;
         let totalDownloads = 2;
 
         console.log({ tagUrls, eventUrls });
-     
+
         tags_downloader.addFiles(tagUrls);
         tags_downloader.start(() => { resolver() });
-   
+
         events_downloader.addFiles(eventUrls);
         events_downloader.start(() => { resolver() });
 
@@ -406,15 +410,15 @@ function generateSyncURLs(lastFetch, currentDate, baseURL, urls) {
  */
 function sync(lastFetch) {
     return new Promise((resolve, reject) => {
-        
+
         // Find the current Date
         const currentDate = new Date(Date.now())
-        currentDate.setDate(currentDate.getDate() - 2);
+        currentDate.setDate(currentDate.getDate());
 
         // Create Arrays to hold the urls to be downloaded
         const eventUrls = [];
         const tagUrls = [];
-        
+
         // Fill the URLs arrays
         let dateItr = new Date(lastFetch.getTime());
         generateSyncURLs(dateItr, currentDate, eventsBaseURL, eventUrls);
