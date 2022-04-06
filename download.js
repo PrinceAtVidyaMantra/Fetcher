@@ -1,6 +1,6 @@
 /* eslint-disable max-classes-per-file */
 
-const ARE_LOGS_ON = true;
+const ARE_LOGS_ON = false;
 
 const startDate = new Date(Date.UTC(2021, 0, 1));
 
