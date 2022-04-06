@@ -41,7 +41,7 @@ let request = (interval_name, date, baseURL, urls, type) => {
         urls.push(jsonPath + filename);
     }
     else if (interval_name == 'hour' && type == "events") {
-        const filename = `/h/${year}-${dayOfYear}-${hours + 1}.json`;
+        const filename = `/h/${year}-${dayOfYear}-${hours}.json`;
         urls.push(jsonPath + filename);
     }
     else {
