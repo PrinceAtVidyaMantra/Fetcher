@@ -259,7 +259,7 @@ class Downloader {
     }
     const url = this.urls[index];
 
-    if (this.type === "tags") {
+    if (this.type === "events") {
       // ================================= Hour Block =================================
 
       // if the failed file is an hour file
@@ -271,7 +271,7 @@ class Downloader {
       }
 
       // ==============================================================================
-    } else if (this.type === "events") {
+    } else if (this.type === "tags") {
       // ================================= Day Block ==================================
 
       // if the failed file is a day file
