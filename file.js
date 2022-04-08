@@ -48,7 +48,7 @@ function parseURL(url) {
     const dayOfYear = parseInt(time.split("-")[1], 10);
     // Adding 1 since months in URLs start from 1, while in dates start from 0
     res.month = getMonthAndDate(dayOfYear, res.year).month + 1;
-    res.day = getMonthAndDate(dayOfYear, res.year).date;
+    res.date = getMonthAndDate(dayOfYear, res.year).date;
   }
   
   if (url.includes("/h/")) {
@@ -121,17 +121,20 @@ function mergeTimeSpan(urls, timeSpan) {
   const firstURL = urls[0];
   const lastURL = urls[urls.length - 1];
 
+  const firstURLInfo = parseURL(firstURL);
+  const lastURLInfo = parseURL(lastURL);
+
   if (timeSpan === "month") {
-    if (getMonth(firstURL) === 1 && getMonth(lastURL) === 12) {
-      return `${baseURL}/y/${getYear(firstURL)}.json`;
+    if (firstURLInfo.month === 1 && lastURLInfo.month === 12) {
+      return `${baseURL}/y/${firstURLInfo.year}.json`;
     }
   } else if (timeSpan === "day") {
-    if (getDay(firstURL) === 1 && getDay(lastURL) === daysInMonth(getMonth(firstURL), getYear(firstURL))) {
-      return `${baseURL}/m/${getYear(firstURL)}-${getMonth(firstURL)}.json`;
+    if (firstURLInfo.date === 1 && lastURLInfo.date === daysInMonth(firstURLInfo.month, firstURLInfo.year)) {
+      return `${baseURL}/m/${firstURLInfo.year}-${firstURLInfo.month}.json`;
     }
   } else if (timeSpan === "hour") {
-    if (getHour(firstURL) === 0 && getHour(lastURL) === 23) {
-      return `${baseURL}/d/${getYear(firstURL)}-${getDay(firstURL)}.json`;
+    if (firstURLInfo.hour  === 0 && lastURLInfo.hour === 23) {
+      return `${baseURL}/d/${firstURLInfo.year}-${firstURLInfo.date}.json`;
     }
   }
 
