@@ -89,63 +89,27 @@ function getHour(url) {
   return null;
 }
 
-/**
- * Returns a merged url of hours if merging is possible
- * else returns null
- *
- * @param {String[]} urls Array of hour URLs
- * @returns {String | null} The merged URL or null
- */
-function mergeHours(urls) {
+function mergeTimeSpan(urls, timeSpan) {
   if (!urls.length) return null;
 
   const firstURL = urls[0];
   const lastURL = urls[urls.length - 1];
 
-  if (getHour(firstURL) === 0 && getHour(lastURL) === 23) {
-    return `${baseURL}/d/${getYear(firstURL)}-${getDay(firstURL)}.json`;
+  if (timeSpan === "month") {
+    if (getMonth(firstURL) === 1 && getMonth(lastURL) === 12) {
+      return `${baseURL}/y/${getYear(firstURL)}.json`;
+    }
+  } else if (timeSpan === "day") {
+    if (getDay(firstURL) === 1 && getDay(lastURL) === daysInMonth(getMonth(firstURL), getYear(firstURL))) {
+      return `${baseURL}/m/${getYear(firstURL)}-${getMonth(firstURL)}.json`;
+    }
+  } else if (timeSpan === "hour") {
+    if (getHour(firstURL) === 0 && getHour(lastURL) === 23) {
+      return `${baseURL}/d/${getYear(firstURL)}-${getDay(firstURL)}.json`;
+    }
   }
 
-  return null;
-}
-
-/**
- * Returns a merged url of days if merging is possible
- * else returns null
- *
- * @param {String[]} urls Array of day URLs
- * @returns {String | null} The merged URL or null
- */
-function mergeDays(urls) {
-  if (!urls.length) return null;
-
-  const firstURL = urls[0];
-  const lastURL = urls[urls.length - 1];
-
-  if (getDay(firstURL) === 1 && getDay(lastURL) === daysInMonth(getMonth(firstURL), getYear(firstURL))) {
-    return `${baseURL}/m/${getYear(firstURL)}-${getMonth(firstURL)}.json`;
-  }
-
-  return null;
-}
-
-/**
- * Returns a merged url of months if merging is possible
- * else returns null
- *
- * @param {String[]} urls Array of month URLs
- * @returns {String | null} The merged URL or null
- */
-function mergeMonths(urls) {
-  if (!urls.length) return null;
-
-  const firstURL = urls[0];
-  const lastURL = urls[urls.length - 1];
-
-  if (getMonth(firstURL) === 1 && getMonth(lastURL) === 12) {
-    return `${baseURL}/y/${getYear(firstURL)}.json`;
-  }
-
+  // "years" are never merged
   return null;
 }
 
@@ -167,27 +131,27 @@ function mergeURLs(urls, _baseURL) {
   while (start < urls.length) {
     const url = urls[start];
     let items = 0;
-    let mergeFunc;
+    let timeSpan;
 
     if (url.includes("/h/")) {
       const day = getDay(urls[start]); // 96
       while (start + items < urls.length && getDay(urls[start + items]) === day && urls[start + items]?.includes("/h/")) items += 1;
-      mergeFunc = mergeHours;
+      timeSpan = "hour";
     } else if (url.includes("/d/")) {
       const month = getMonth(urls[start]); // 2
       while (start + items < urls.length && getMonth(urls[start + items]) === month && urls[start + items]?.includes("/d/")) items += 1;
-      mergeFunc = mergeDays;
+      timeSpan = "day";
     } else if (url.includes("/m/")) {
       const day = getYear(urls[start]);
       while (start + items < urls.length && getYear(urls[start + items]) === day && urls[start + items]?.includes("/m/")) items += 1;
-      mergeFunc = mergeMonths;
+      timeSpan = "month";
     } else if (url.includes("/y/")) {
       while (start + items < urls.length && urls[start + items]?.includes("/y/")) items += 1;
-      mergeFunc = () => null;
+      timeSpan = "year";
     }
 
     const itemsArray = urls.slice(start, start + items);
-    const mergedURL = mergeFunc(itemsArray);
+    const mergedURL = mergeTimeSpan(itemsArray, timeSpan);
 
     // Append merged URLs in result
     debugger;
@@ -206,7 +170,8 @@ function mergeURLs(urls, _baseURL) {
   return res;
 }
 
-export default mergeURLs;
+// export default mergeURLs;
+
 
 function driver() {
     let urls = [];
@@ -221,7 +186,7 @@ function driver() {
     urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-7.json`)
 
     for (let i = 32; i <= 65; ++i) {
-        urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-${i}.json`)    
+        urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-${i}.json`)
     }
 
     console.log(mergeURLs(urls, "https://dyncdn.exampathfinder.com/alertjsons/events"));
