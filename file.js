@@ -36,13 +36,13 @@ function daysInMonth(month, year) {
 function parseURL(url) {
   const res = {};
   if (!url) return res;
-  
+
   const time = url.match(timeRegex)[0];
   res.year = parseInt(time.split("-")[0], 10);
-  
+
   if (url.includes("/m/")) {
     res.month = parseInt(time.split("-")[1], 10);
-  } 
+  }
 
   if (url.includes("/d/") || url.includes("/h/")) {
     const dayOfYear = parseInt(time.split("-")[1], 10);
@@ -50,17 +50,13 @@ function parseURL(url) {
     res.month = getMonthAndDate(dayOfYear, res.year).month + 1;
     res.date = getMonthAndDate(dayOfYear, res.year).date;
   }
-  
+
   if (url.includes("/h/")) {
     res.hour = parseInt(time.split("-")[2], 10);
   }
 
-  return res; 
+  return res;
 }
-
-
-
-
 
 function mergeTimeSpan(urls, timeSpan) {
   if (!urls.length) return null;
@@ -80,7 +76,7 @@ function mergeTimeSpan(urls, timeSpan) {
       return `${baseURL}/m/${firstURLInfo.year}-${firstURLInfo.month}.json`;
     }
   } else if (timeSpan === "hour") {
-    if (firstURLInfo.hour  === 0 && lastURLInfo.hour === 23) {
+    if (firstURLInfo.hour === 0 && lastURLInfo.hour === 23) {
       return `${baseURL}/d/${firstURLInfo.year}-${firstURLInfo.date}.json`;
     }
   }
@@ -109,20 +105,26 @@ function mergeURLs(urls, _baseURL) {
     let items = 0;
     let timeSpan;
 
+    const startURLInfo = parseURL(urls[start]);
+
     if (url.includes("/h/")) {
-      const date = parseURL(urls[start]).date;
-      while (start + items < urls.length && parseURL(urls[start + items]).date === date && urls[start + items]?.includes("/h/")) items += 1;
+      while (start + items < urls.length
+        && parseURL(urls[start + items]).date === startURLInfo.date
+        && urls[start + items]?.includes("/h/")) items += 1;
       timeSpan = "hour";
     } else if (url.includes("/d/")) {
-      const month = parseURL(urls[start]).month;
-      while (start + items < urls.length && parseURL(urls[start + items]).month === month && urls[start + items]?.includes("/d/")) items += 1;
+      while (start + items < urls.length
+        && parseURL(urls[start + items]).month === startURLInfo.month
+        && urls[start + items]?.includes("/d/")) items += 1;
       timeSpan = "day";
     } else if (url.includes("/m/")) {
-      const year = parseURL(urls[start]).year;
-      while (start + items < urls.length && parseURL(urls[start + items]).year === year && urls[start + items]?.includes("/m/")) items += 1;
+      while (start + items < urls.length
+        && parseURL(urls[start + items]).year === startURLInfo.year
+        && urls[start + items]?.includes("/m/")) items += 1;
       timeSpan = "month";
     } else if (url.includes("/y/")) {
-      while (start + items < urls.length && urls[start + items]?.includes("/y/")) items += 1;
+      while (start + items < urls.length
+        && urls[start + items]?.includes("/y/")) items += 1;
       timeSpan = "year";
     }
 
@@ -147,6 +149,8 @@ function mergeURLs(urls, _baseURL) {
 }
 
 // export default mergeURLs;
+
+
 
 
 function driver() {
