@@ -34,7 +34,11 @@ const generateFilePath = (intervalName, date, baseURL) => {
 };
 
 function daysInMonth(month, year) {
-    return new Date(year, month, 0).getUTCDate();
+    const d = new Date(year, month);
+    d.setUTCFullYear(year);
+    d.setUTCMonth(month);
+    d.setUTCDate(0);
+    return d.getUTCDate();
 }
 
 /**
@@ -361,7 +365,7 @@ function generateSyncURLs(lastFetch, currentDate, baseURL, urls) {
         if (dateItr.getUTCHours() !== hours) break;
     }
 
-    while (dateItr.getUTCDate() <= daysInMonth(dateItr.getUTCMonth(), dateItr.getUTCFullYear()) && dateItr < currentDate) {
+    while (dateItr.getUTCDate() <= daysInMonth(dateItr.getUTCMonth() + 1, dateItr.getUTCFullYear()) && dateItr < currentDate) {
         urls.push(generateFilePath("day", dateItr, baseURL));
         const days = dateItr.getUTCDate() + 1;
         dateItr.setUTCDate(dateItr.getUTCDate() + 1);
