@@ -32,6 +32,32 @@ function daysInMonth(month, year) {
   d.setUTCDate(0);
   return d.getUTCDate();
 }
+
+function parseURL(url) {
+  const res = {};
+  if (!url) return res;
+  
+  const time = url.match(timeRegex)[0];
+  res.year = parseInt(time.split("-")[0], 10);
+  
+  if (url.includes("/m/")) {
+    res.month = parseInt(time.split("-")[1], 10);
+  } 
+
+  if (url.includes("/d/") || url.includes("/h/")) {
+    const dayOfYear = parseInt(time.split("-")[1], 10);
+    // Adding 1 since months in URLs start from 1, while in dates start from 0
+    res.month = getMonthAndDate(dayOfYear, res.year).month + 1;
+    res.day = getMonthAndDate(dayOfYear, res.year).date;
+  }
+  
+  if (url.includes("/h/")) {
+    res.hour = parseInt(time.split("-")[2], 10);
+  }
+
+  return res; 
+}
+
 /**
  * Finds the 4-digit year from given URL
  *
