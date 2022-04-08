@@ -17,6 +17,7 @@ function getMonthAndDate(dayOfYear, year) {
   d.setUTCDate(dayOfYear);
   return { month: d.getUTCMonth(), date: d.getUTCDate() };
 }
+
 /**
  * Retunrs the number of days in the corresponding month
  * in the given year
@@ -33,6 +34,14 @@ function daysInMonth(month, year) {
   return d.getUTCDate();
 }
 
+/**
+ * Parse the given url and returns an object with day, month, hour, year info
+ * in this format
+ * { year, month, date, month }
+ *
+ * @param {String} url url to be parsed
+ * @returns {Object} info in above given format
+ */
 function parseURL(url) {
   const res = {};
   if (!url) return res;
@@ -58,6 +67,13 @@ function parseURL(url) {
   return res;
 }
 
+/**
+ * Merges the array of urls into a single url if possible
+ *
+ * @param {String[]} urls Array of urls to be merged
+ * @param {String} timeSpan the timeSpan can be one of ["hour", "year", "month", "day"]
+ * @returns {String | null} mergedURL if urls can be merged else null
+ */
 function mergeTimeSpan(urls, timeSpan) {
   if (!urls.length) return null;
 
@@ -85,13 +101,42 @@ function mergeTimeSpan(urls, timeSpan) {
   return null;
 }
 
+function findMergebleURLsInfo(urls, start) {
+  const url = urls[start];
+  const startURLInfo = parseURL(url);
+  let items = 0;
+  let timeSpan;
+
+  if (url.includes("/h/")) {
+    while (start + items < urls.length
+      && parseURL(urls[start + items]).date === startURLInfo.date
+      && urls[start + items]?.includes("/h/")) items += 1;
+    timeSpan = "hour";
+  } else if (url.includes("/d/")) {
+    while (start + items < urls.length
+      && parseURL(urls[start + items]).month === startURLInfo.month
+      && urls[start + items]?.includes("/d/")) items += 1;
+    timeSpan = "day";
+  } else if (url.includes("/m/")) {
+    while (start + items < urls.length
+      && parseURL(urls[start + items]).year === startURLInfo.year
+      && urls[start + items]?.includes("/m/")) items += 1;
+    timeSpan = "month";
+  } else if (url.includes("/y/")) {
+    while (start + items < urls.length
+      && urls[start + items]?.includes("/y/")) items += 1;
+    timeSpan = "year";
+  }
+
+  return { itemCount: items, timeSpan };
+}
+
 /**
  * Recursively merges the given array of URLs
  *
  * @param {String[]} urls Array of URLs
  * @param {String} _baseURL baseURL for files
 */
-
 function mergeURLs(urls, _baseURL) {
   // Update baseURL
   baseURL = _baseURL;
@@ -101,38 +146,11 @@ function mergeURLs(urls, _baseURL) {
   let mergingWasDone = false;
 
   while (start < urls.length) {
-    const url = urls[start];
-    let items = 0;
-    let timeSpan;
-
-    const startURLInfo = parseURL(urls[start]);
-
-    if (url.includes("/h/")) {
-      while (start + items < urls.length
-        && parseURL(urls[start + items]).date === startURLInfo.date
-        && urls[start + items]?.includes("/h/")) items += 1;
-      timeSpan = "hour";
-    } else if (url.includes("/d/")) {
-      while (start + items < urls.length
-        && parseURL(urls[start + items]).month === startURLInfo.month
-        && urls[start + items]?.includes("/d/")) items += 1;
-      timeSpan = "day";
-    } else if (url.includes("/m/")) {
-      while (start + items < urls.length
-        && parseURL(urls[start + items]).year === startURLInfo.year
-        && urls[start + items]?.includes("/m/")) items += 1;
-      timeSpan = "month";
-    } else if (url.includes("/y/")) {
-      while (start + items < urls.length
-        && urls[start + items]?.includes("/y/")) items += 1;
-      timeSpan = "year";
-    }
-
-    const itemsArray = urls.slice(start, start + items);
+    const { itemCount, timeSpan } = findMergebleURLsInfo(urls, start);
+    const itemsArray = urls.slice(start, start + itemCount);
     const mergedURL = mergeTimeSpan(itemsArray, timeSpan);
 
     // Append merged URLs in result
-    debugger;
     if (mergedURL == null) {
       res = [...res, ...itemsArray];
     } else {
@@ -141,7 +159,7 @@ function mergeURLs(urls, _baseURL) {
     }
 
     // Update Start
-    start += items;
+    start += itemCount;
   }
 
   if (mergingWasDone) return mergeURLs(res);
@@ -154,22 +172,22 @@ function mergeURLs(urls, _baseURL) {
 
 
 function driver() {
-    let urls = [];
-    for (let i = 1; i < 4; ++i) {
-        for (let j = 0; j < 24; ++j) {
-            urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/h/2021-${i}-${j}.json`);
-        }
+  let urls = [];
+  for (let i = 1; i < 4; ++i) {
+    for (let j = 0; j < 24; ++j) {
+      urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/h/2021-${i}-${j}.json`);
     }
-    urls.splice(0, 1);
-    urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-4.json`)
-    urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-5.json`)
-    urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-7.json`)
+  }
+  urls.splice(0, 1);
+  urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-4.json`)
+  urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-5.json`)
+  urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-7.json`)
 
-    for (let i = 32; i <= 65; ++i) {
-        urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-${i}.json`)
-    }
+  for (let i = 32; i <= 65; ++i) {
+    urls.push(`https://dyncdn.exampathfinder.com/alertjsons/events/d/2021-${i}.json`)
+  }
 
-    console.log(mergeURLs(urls, "https://dyncdn.exampathfinder.com/alertjsons/events"));
+  console.log(mergeURLs(urls, "https://dyncdn.exampathfinder.com/alertjsons/events"));
 }
 
 driver();
