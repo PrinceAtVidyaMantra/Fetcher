@@ -58,62 +58,9 @@ function parseURL(url) {
   return res; 
 }
 
-/**
- * Finds the 4-digit year from given URL
- *
- * @param {String} url URL to be searched for year
- * @returns {Number | null} a 4-digit year else null
- */
-function getYear(url) {
-  if (!url) return null;
-  return parseInt(url.match(timeRegex)[0].split("-")[0], 10);
-}
-/**
- * Finds the month number from given URL
- *
- * @param {String} url URL to be searched for month
- * @returns {Number | null} the month number [1-12] else null
- */
-function getMonth(url) {
-  if (url.includes("/m/")) {
-    return parseInt(url.match(timeRegex)[0].split("-")[1], 10);
-  } if (url.includes("/d/") || url.includes("/h/")) {
-    const year = getYear(url);
-    const dayOfYear = parseInt(url.match(timeRegex)[0].split("-")[1], 10);
 
-    // Adding 1 since months in URLs start from 1, while in dates start from 0
-    return getMonthAndDate(dayOfYear, year).month + 1;
-  }
-  return null;
-}
 
-/**
- * Finds the day number from given URL
- *
- * @param {String} url URL to be searched for day
- * @returns {Number | null} the day number [1-30] else null
- */
-function getDay(url) {
-  if (url.includes("/d/") || url.includes("/h/")) {
-    const year = getYear(url);
-    const dayOfYear = parseInt(url.match(timeRegex)[0].split("-")[1], 10);
-    return getMonthAndDate(dayOfYear, year).date;
-  }
-  return null;
-}
 
-/**
- * Finds the hour number from given URL
- *
- * @param {String} url URL to be searched for hour
- * @returns {Number | null} the hour number [0-23] else null
- */
-function getHour(url) {
-  if (url.includes("/h/")) {
-    return parseInt(url.match(timeRegex)[0].split("-")[2], 10);
-  }
-  return null;
-}
 
 function mergeTimeSpan(urls, timeSpan) {
   if (!urls.length) return null;
@@ -163,16 +110,16 @@ function mergeURLs(urls, _baseURL) {
     let timeSpan;
 
     if (url.includes("/h/")) {
-      const day = getDay(urls[start]); // 96
-      while (start + items < urls.length && getDay(urls[start + items]) === day && urls[start + items]?.includes("/h/")) items += 1;
+      const date = parseURL(urls[start]).date;
+      while (start + items < urls.length && parseURL(urls[start + items]).date === date && urls[start + items]?.includes("/h/")) items += 1;
       timeSpan = "hour";
     } else if (url.includes("/d/")) {
-      const month = getMonth(urls[start]); // 2
-      while (start + items < urls.length && getMonth(urls[start + items]) === month && urls[start + items]?.includes("/d/")) items += 1;
+      const month = parseURL(urls[start]).month;
+      while (start + items < urls.length && parseURL(urls[start + items]).month === month && urls[start + items]?.includes("/d/")) items += 1;
       timeSpan = "day";
     } else if (url.includes("/m/")) {
-      const day = getYear(urls[start]);
-      while (start + items < urls.length && getYear(urls[start + items]) === day && urls[start + items]?.includes("/m/")) items += 1;
+      const year = parseURL(urls[start]).year;
+      while (start + items < urls.length && parseURL(urls[start + items]).year === year && urls[start + items]?.includes("/m/")) items += 1;
       timeSpan = "month";
     } else if (url.includes("/y/")) {
       while (start + items < urls.length && urls[start + items]?.includes("/y/")) items += 1;
